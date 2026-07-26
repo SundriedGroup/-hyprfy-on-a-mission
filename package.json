@@ -1,7 +1,7 @@
 {
   "name": "hyprfy-on-a-mission",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {"dev":"vite","build":"vite build","preview":"vite preview"},
   "dependencies": {"@supabase/supabase-js":"^2.57.4"},
