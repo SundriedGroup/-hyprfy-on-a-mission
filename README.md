@@ -1,15 +1,9 @@
-# Hyprfy — On a Mission v0.9.1
+# Hyprfy — On a Mission v0.9.2
 
-Clean repack of the current beta.
+Verified syntax hotfix for the v0.9.1 deployment failure.
 
-Includes BOARD / DAY / EPISODE / MONTHLY, today highlighting, production status,
-capture checklist, in-app content editing, July Postcards monthly wrap, Supabase,
-and Vercel configuration.
+Fix:
+- Removed a literal `\\n` accidentally written into `src.js` between `isToday()` and `card()`.
+- `node --check src.js` passes successfully.
 
-Environment variables:
-VITE_SUPABASE_URL
-VITE_SUPABASE_PUBLISHABLE_KEY
-
-Local:
-npm install
-npm run dev
+Feature set remains unchanged from v0.9.1.
