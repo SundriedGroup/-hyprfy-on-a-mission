@@ -1,130 +1,50 @@
-// Hyprfy Social Stats Dashboard
-// Additive module for the existing Vite + Supabase app.
-// Usage from src.js:
-//   import { renderSocialStats } from "./stats-dashboard.js";
-//   import "./stats-dashboard.css";
-//   ...then call: renderSocialStats(view, sb);
+const PERIODS=[7,30,90],n=v=>Number(v||0),div=(a,b)=>b?a/b:0;
+const fmt=v=>{let x=n(v);return Math.abs(x)>=1e6?(x/1e6).toFixed(1).replace(".0","")+"M":Math.abs(x)>=1e3?(x/1e3).toFixed(1).replace(".0","")+"K":Math.round(x).toLocaleString("en-ZA")};
+const pct=v=>`${n(v).toFixed(1)}%`;
+const dur=ms=>{let s=Math.round(n(ms)/1000);if(!s)return"—";if(s<60)return`${s}s`;let m=Math.floor(s/60);if(m<60)return`${m}m ${s%60}s`;return`${Math.floor(m/60)}h ${m%60}m`};
+const sum=(a,k)=>a.reduce((t,r)=>t+n(r[k]),0);
+const since=d=>{let x=new Date();x.setDate(x.getDate()-d);return x.toISOString()};
+const cap=s=>{s=String(s||"Untitled post").replace(/\s+/g," ").trim();return s.length>70?s.slice(0,70)+"…":s};
+const metric=(a,b,c)=>`<article class=statsMetric><span>${a}</span><strong>${b}</strong><small>${c||""}</small></article>`;
 
-const fmt = new Intl.NumberFormat("en-ZA");
-const compact = new Intl.NumberFormat("en-ZA", { notation: "compact", maximumFractionDigits: 1 });
-
-function n(v){ return Number(v || 0); }
-function safe(v=""){ return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
-function pct(v){ const x=n(v); return `${x>0?"+":""}${x.toFixed(1)}%`; }
-function deltaClass(v){ return n(v) >= 0 ? "up" : "down"; }
-
-async function loadStats(sb, platform, days){
-  const since = new Date();
-  since.setDate(since.getDate() - (days - 1));
-  const sinceISO = since.toISOString().slice(0,10);
-
-  const [{data:snapshots,error:sErr},{data:posts,error:pErr}] = await Promise.all([
-    sb.from("social_account_daily")
-      .select("*")
-      .eq("platform",platform)
-      .gte("snapshot_date",sinceISO)
-      .order("snapshot_date",{ascending:true}),
-    sb.from("social_post_stats")
-      .select("*")
-      .eq("platform",platform)
-      .gte("published_at",`${sinceISO}T00:00:00Z`)
-      .order("published_at",{ascending:false})
+function calc(rows,account){
+ const posts=rows.length,views=sum(rows,"views"),reach=sum(rows,"reach"),likes=sum(rows,"likes"),comments=sum(rows,"comments"),shares=sum(rows,"shares"),saves=sum(rows,"saves"),watch=sum(rows,"watch_time");
+ const eng=rows.reduce((t,r)=>t+n(r.total_interactions||(n(r.likes)+n(r.comments)+n(r.shares)+n(r.saves))),0);
+ const wr=rows.filter(r=>n(r.avg_watch_time)>0),base=wr.reduce((t,r)=>t+n(r.views),0);
+ const avgWatch=base?wr.reduce((t,r)=>t+n(r.avg_watch_time)*n(r.views),0)/base:div(sum(wr,"avg_watch_time"),wr.length);
+ const viewers=n(account?.period_reach)||null;
+ return{posts,views,reach,likes,comments,shares,saves,watch,eng,avgWatch,viewers,followers:n(account?.followers),avgViews:div(views,posts),avgReach:div(reach,posts),er:reach?eng/reach*100:0,shareRate:reach?shares/reach*100:0,vpv:viewers?views/viewers:null}
+}
+function table(rows){
+ const a=[...rows].sort((x,y)=>n(y.views)-n(x.views)).slice(0,10);
+ if(!a.length)return`<div class=statsEmpty>No posts found in this period.</div>`;
+ return`<div class=statsTableWrap><table class=statsTable><thead><tr><th>CONTENT</th><th>VIEWS</th><th>REACH</th><th>WATCH</th><th>ENG.</th><th>ER</th></tr></thead><tbody>${a.map(r=>{let e=n(r.total_interactions||(n(r.likes)+n(r.comments)+n(r.shares)+n(r.saves))),er=n(r.reach)?e/n(r.reach)*100:0;return`<tr><td>${r.permalink?`<a href="${r.permalink}" target=_blank rel=noopener>${cap(r.caption)}</a>`:cap(r.caption)}<small>${r.media_type||"POST"} · ${new Date(r.published_at).toLocaleDateString("en-ZA",{day:"2-digit",month:"short"})}</small></td><td>${fmt(r.views)}</td><td>${fmt(r.reach)}</td><td>${dur(r.watch_time)}</td><td>${fmt(e)}</td><td>${pct(er)}</td></tr>`}).join("")}</tbody></table></div>`
+}
+export async function renderStatsDashboard(root,sb,initialPlatform="instagram"){
+ if(!root||!sb)return;let platform=initialPlatform,period=30;
+ async function load(){
+  root.innerHTML=`<section class=statsPage><div class=statsLoading>LOADING STATS…</div></section>`;
+  const[p,a]=await Promise.all([
+   sb.from("social_post_stats").select("*").eq("platform",platform).gte("published_at",since(period)).order("published_at",{ascending:false}),
+   sb.from("social_account_daily").select("*").eq("platform",platform).order("snapshot_date",{ascending:false}).limit(1).maybeSingle()
   ]);
-  if(sErr) throw sErr;
-  if(pErr) throw pErr;
-
-  const s = snapshots || [], p = posts || [];
-  const latest = s.at(-1) || {};
-  const previous = s[0] || {};
-  const reach = n(latest.period_reach);
-  const totalViews = p.reduce((a,x)=>a+n(x.views),0);
-  const avgViews = p.length ? totalViews / p.length : 0;
-  const followers = n(latest.followers);
-  const followerDelta = followers - n(previous.followers);
-  const followerPct = n(previous.followers) ? followerDelta/n(previous.followers)*100 : 0;
-
-  return { snapshots:s, posts:p, reach, totalViews, avgViews, followers, followerDelta, followerPct };
-}
-
-function chart(points){
-  if(!points.length) return `<div class="ss-empty">No daily reach history yet.</div>`;
-  const vals = points.map(x=>n(x.period_reach));
-  const max = Math.max(...vals,1), min = Math.min(...vals,0);
-  const range = Math.max(max-min,1);
-  const w=700,h=220,pad=12;
-  const coords = vals.map((v,i)=>{
-    const x = pad + (i/Math.max(vals.length-1,1))*(w-pad*2);
-    const y = h-pad-((v-min)/range)*(h-pad*2);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(" ");
-  return `<svg class="ss-chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="Account reach trend">
-    <polyline points="${coords}" fill="none" stroke="currentColor" stroke-width="3" vector-effect="non-scaling-stroke"/>
-  </svg>`;
-}
-
-function postRows(posts){
-  if(!posts.length) return `<div class="ss-empty">No posts have been synced for this period yet.</div>`;
-  return `<div class="ss-table-wrap"><table class="ss-table">
-    <thead><tr><th>Content</th><th>Published</th><th>Reach</th><th>Views</th><th>Likes</th><th>Comments</th><th>Shares</th><th>Saves</th></tr></thead>
-    <tbody>${posts.map(p=>`<tr>
-      <td><div class="ss-content"><b>${safe(p.media_type || "POST")}</b><span>${safe((p.caption||"Untitled post").slice(0,72))}</span></div></td>
-      <td>${new Date(p.published_at).toLocaleDateString("en-ZA",{day:"2-digit",month:"short"})}</td>
-      <td>${fmt.format(n(p.reach))}</td><td>${fmt.format(n(p.views))}</td>
-      <td>${fmt.format(n(p.likes))}</td><td>${fmt.format(n(p.comments))}</td>
-      <td>${fmt.format(n(p.shares))}</td><td>${fmt.format(n(p.saves))}</td>
-    </tr>`).join("")}</tbody>
-  </table></div>`;
-}
-
-export async function renderSocialStats(view, sb){
-  let platform = "instagram", days = 30;
-
-  async function draw(){
-    view.innerHTML = `<section class="ss-page">
-      <div class="ss-loading"><span>SOCIAL INTELLIGENCE</span><h2>STATS</h2><p>Loading ${platform} performance…</p></div>
-    </section>`;
-    try{
-      const d = await loadStats(sb,platform,days);
-      view.innerHTML = `<section class="ss-page">
-        <div class="ss-head">
-          <div><span class="eyebrow">HYPRFY / SOCIAL INTELLIGENCE</span><h2>STATS</h2><p>Understand what is moving your personal brand.</p></div>
-          <div class="ss-controls">
-            <div class="ss-segment">${["instagram","facebook"].map(x=>`<button data-platform="${x}" class="${x===platform?"active":""}">${x}</button>`).join("")}</div>
-            <div class="ss-segment">${[7,30,90].map(x=>`<button data-days="${x}" class="${x===days?"active":""}">${x}D</button>`).join("")}</div>
-          </div>
-        </div>
-
-        <div class="ss-platform"><span>${platform.toUpperCase()}</span><b>${d.followers?fmt.format(d.followers):"—"} followers</b>
-          <small class="${deltaClass(d.followerPct)}">${d.followers?pct(d.followerPct):"Awaiting sync"}</small></div>
-
-        <div class="ss-kpis">
-          <article class="primary"><span>ACCOUNT REACH</span><strong>${compact.format(d.reach)}</strong><small>${days}-day unique reach</small></article>
-          <article class="primary"><span>AVG VIEWS / POST</span><strong>${compact.format(Math.round(d.avgViews))}</strong><small>${d.posts.length} posts in period</small></article>
-          <article><span>TOTAL VIEWS</span><strong>${compact.format(d.totalViews)}</strong><small>Across published content</small></article>
-          <article><span>POSTS PUBLISHED</span><strong>${fmt.format(d.posts.length)}</strong><small>Last ${days} days</small></article>
-        </div>
-
-        <div class="ss-grid">
-          <section class="ss-panel ss-trend"><div class="ss-panel-head"><div><span>ACCOUNT REACH</span><h3>${days}-DAY TREND</h3></div><b>${compact.format(d.reach)}</b></div>${chart(d.snapshots)}</section>
-          <section class="ss-panel ss-summary">
-            <span>PERFORMANCE SNAPSHOT</span>
-            <div><b>${compact.format(d.avgViews)}</b><small>Avg views / post</small></div>
-            <div><b>${compact.format(d.totalViews)}</b><small>Total views</small></div>
-            <div><b>${fmt.format(d.followers)}</b><small>Followers</small></div>
-          </section>
-        </div>
-
-        <section class="ss-panel ss-content-panel">
-          <div class="ss-panel-head"><div><span>CONTENT PERFORMANCE</span><h3>RECENT POSTS</h3></div><small>${platform.toUpperCase()} · ${days} DAYS</small></div>
-          ${postRows(d.posts)}
-        </section>
-      </section>`;
-
-      view.querySelectorAll("[data-platform]").forEach(b=>b.onclick=()=>{platform=b.dataset.platform;draw()});
-      view.querySelectorAll("[data-days]").forEach(b=>b.onclick=()=>{days=Number(b.dataset.days);draw()});
-    }catch(err){
-      view.innerHTML=`<section class="ss-page"><div class="ss-error"><span>SOCIAL INTELLIGENCE</span><h2>STATS</h2><p>${safe(err.message)}</p><small>Run the supplied Supabase migration and sync social data before opening this dashboard.</small></div></section>`;
-    }
-  }
-  await draw();
+  if(p.error){root.innerHTML=`<section class=statsPage><div class=statsError>${p.error.message}</div></section>`;return}
+  const rows=p.data||[],account=a.data||null,m=calc(rows,account);
+  root.innerHTML=`<section class=statsPage>
+   <div class=statsHero><div><span class=statsEyebrow>HYPRFY / PERSONAL BRAND INTELLIGENCE</span><h2>STATS</h2><p>Understand what is moving your personal brand.</p></div>
+   <div class=statsControls><div class=statsToggle>${["instagram","facebook"].map(x=>`<button data-platform=${x} class=${platform===x?"active":""}>${x.toUpperCase()}</button>`).join("")}</div><div class=statsToggle>${PERIODS.map(x=>`<button data-period=${x} class=${period===x?"active":""}>${x}D</button>`).join("")}</div></div></div>
+   <div class=statsAccount><b>${platform.toUpperCase()}</b><span>${m.followers?fmt(m.followers)+" followers":"Follower data unavailable"}</span><i>ORGANIC</i></div>
+   <div class=statsSectionHead><span>ATTENTION</span><h3>HOW MUCH ATTENTION DID THE CONTENT EARN?</h3></div>
+   <div class=statsGrid>${metric("TOTAL VIEWS",fmt(m.views),`${m.posts} posts in ${period} days`)}${metric("VIEWERS",m.viewers?fmt(m.viewers):"—",m.viewers?"Unique accounts reached":"Account reach awaiting Meta")}${metric("VIEWS / VIEWER",m.vpv?m.vpv.toFixed(2)+"x":"—","Repeat consumption")}${metric("WATCH TIME",dur(m.watch),"Video / Reel watch time")}${metric("AVG WATCH TIME",dur(m.avgWatch),"Average video watch")}${metric("FOLLOWERS",fmt(m.followers),"Current audience")}</div>
+   <div class=statsSectionHead><span>ENGAGEMENT</span><h3>WHAT DID PEOPLE DO WITH THE CONTENT?</h3></div>
+   <div class=statsGrid>${metric("ENGAGEMENTS",fmt(m.eng),"Likes + comments + shares + saves")}${metric("ENGAGEMENT RATE",pct(m.er),"Engagements ÷ summed post reach")}${metric("SHARES",fmt(m.shares),m.reach?pct(m.shareRate)+" share rate":"Distribution signal")}${metric("SAVES",fmt(m.saves),"Intent / utility signal")}${metric("COMMENTS",fmt(m.comments),"Conversation")}${metric("LIKES",fmt(m.likes),"Lightweight response")}</div>
+   <div class=statsSectionHead><span>CONTENT</span><h3>WHAT IS THE OUTPUT DOING?</h3></div>
+   <div class="statsGrid statsGridContent">${metric("AVG VIEWS / POST",fmt(m.avgViews),`${m.posts} posts in period`)}${metric("AVG REACH / POST",fmt(m.avgReach),"Average post reach")}${metric("POSTS PUBLISHED",fmt(m.posts),`Last ${period} days`)}${metric("SUMMED POST REACH",fmt(m.reach),"Not unique account reach")}</div>
+   <div class=statsSectionHead><span>TOP CONTENT</span><h3>WHAT IS WINNING ATTENTION?</h3></div>${table(rows)}
+   <div class=statsNote><b>DATA NOTE</b><p>VIEWERS uses true account-level reach only when Meta returns it. Until then it shows — rather than incorrectly adding post reach together.</p></div>
+  </section>`;
+  root.querySelectorAll("[data-platform]").forEach(b=>b.onclick=async()=>{platform=b.dataset.platform;await load()});
+  root.querySelectorAll("[data-period]").forEach(b=>b.onclick=async()=>{period=+b.dataset.period;await load()});
+ }
+ await load()
 }
