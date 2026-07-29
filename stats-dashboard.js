@@ -7,12 +7,16 @@ const since=d=>{let x=new Date();x.setDate(x.getDate()-d);return x.toISOString()
 const cap=s=>{s=String(s||"Untitled post").replace(/\s+/g," ").trim();return s.length>70?s.slice(0,70)+"…":s};
 const metric=(a,b,c)=>`<article class=statsMetric><span>${a}</span><strong>${b}</strong><small>${c||""}</small></article>`;
 
-function calc(rows,account){
+function calc(rows,account,period){
  const posts=rows.length,views=sum(rows,"views"),reach=sum(rows,"reach"),likes=sum(rows,"likes"),comments=sum(rows,"comments"),shares=sum(rows,"shares"),saves=sum(rows,"saves"),watch=sum(rows,"watch_time");
  const engagements=rows.reduce((t,r)=>t+n(r.total_interactions||(n(r.likes)+n(r.comments)+n(r.shares)+n(r.saves))),0);
  const watchRows=rows.filter(r=>n(r.avg_watch_time)>0),watchViews=watchRows.reduce((t,r)=>t+n(r.views),0);
  const avgWatch=watchViews?watchRows.reduce((t,r)=>t+n(r.avg_watch_time)*n(r.views),0)/watchViews:div(sum(watchRows,"avg_watch_time"),watchRows.length);
- const viewers=n(account?.period_reach)||0;
+ const viewers=n(
+   period===7 ? account?.reach_7d :
+   period===30 ? account?.reach_30d :
+   account?.reach_90d
+ )||0;
  return{posts,views,reach,likes,comments,shares,saves,watch,engagements,avgWatch,viewers,followers:n(account?.followers),avgViews:div(views,posts),avgReach:div(reach,posts),engagementRate:reach?engagements/reach*100:0}
 }
 function leaderboard(rows){
@@ -31,7 +35,7 @@ export async function renderStatsDashboard(root,sb,initialPlatform="instagram"){
    sb.from("social_account_daily").select("*").eq("platform",platform).order("snapshot_date",{ascending:false}).limit(1).maybeSingle()
   ]);
   if(p.error){root.innerHTML=`<section class=statsPage><div class=statsError>${p.error.message}</div></section>`;return}
-  const rows=p.data||[],account=a.data||null,m=calc(rows,account);
+  const rows=p.data||[],account=a.data||null,m=calc(rows,account,period);
   root.innerHTML=`<section class=statsPage>
    <div class=statsHero>
     <div><span class=statsEyebrow>HYPRFY / PERSONAL BRAND INTELLIGENCE</span><h2>STATS</h2><p>Understand what is moving your personal brand.</p></div>
