@@ -78,3 +78,7 @@ export async function renderStatsDashboard(root,sb,initialPlatform="instagram"){
  }
  await load();
 }
+
+
+// Backwards compatibility with the existing Hyprfy src.js import.
+export const renderSocialStats = renderStatsDashboard;
