@@ -12,7 +12,7 @@ const DN=["MON","TUE","WED","THU","FRI","SAT","SUN"],CH=["instagram","threads","
 function date(start,i=0){let d=new Date(start+"T12:00:00");d.setDate(d.getDate()+i);return d}
 function ds(start,i=0){return date(start,i).toLocaleDateString("en-ZA",{day:"2-digit",month:"short"}).toUpperCase()}
 function iso(start,i){return date(start,i).toISOString().slice(0,10)}
-function shell(){app.innerHTML=`<header><div><span class=kicker>HYPRFY / LIFE OS</span><h1>ON A MISSION</h1><em>More life. Less excuses.</em></div><span id=status>SYNCED</span><nav>${["weeks","intelligence","stats","calendar","moments"].map(x=>`<button data-tab=${x} class=${S.tab===x?"active":""}>${x}</button>`).join("")}</nav></header><main id=view></main>`;document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;shell();render()})}
+function shell(){app.innerHTML=`<header><div><span class=kicker>HYPRFY / LIFE OS</span><h1>ON A MISSION</h1><em>More life. Less excuses.</em></div><span id=status>SYNCED</span><nav>${["weeks","intelligence","calendar","moments"].map(x=>`<button data-tab=${x} class=${S.tab===x?"active":""}>${x}</button>`).join("")}</nav></header><main id=view></main>`;document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;shell();render()})}
 function adapt(d){return d.adaptive||{actual:[]}}
 function prod(d){return d.production||{status:"planned",captured:[]}}
 async function saveDays(w){let{error}=await sb.from("weeks").update({days:w.days}).eq("start_date",w.start_date);if(error){alert(error.message);return false}return true}
@@ -102,7 +102,6 @@ function render(){
     return;
   }
   if(S.tab==="intelligence")return intelligence();
-  if(S.tab==="stats")return renderSocialStats(V(),sb);
   return ({weeks,calendar,moments}[S.tab]||weeks)();
 }
 
