@@ -57,25 +57,48 @@ function postingSummary(p){
  if(!p)return`<div class="postsummary emptyplan"><span>POSTING PLAN</span><strong>STORIES / NO FEED</strong><p>Stay present. Do not force a feed post.</p></div>`;
  return`<div class=postsummary><span>POSTING PLAN</span><strong>${E(p.fmt||"")}</strong><h4>${E(p.concept||"")}</h4>${p.viewer_value?`<p>${NL(p.viewer_value)}</p>`:""}</div>`
 }
+function visualForLine(line,i,ig){
+  const shots=Array.isArray(ig?.shots)?ig.shots:[];
+  if(shots[i])return shots[i];
+  const t=(line||"").toLowerCase();
+  if(/r&d|team|session|learn|thinking|went into/.test(t))return"R&D session — team, room, discussion, product details";
+  if(/gym|training|work|family|days/.test(t))return"Real-life B-roll — work / training / family";
+  if(/product|range|using|early access|quiet/.test(t))return"Product B-roll — bathroom, gym bag, natural use";
+  return i===0?"TO CAMERA — direct opening":"Supporting B-roll from the day";
+}
+function scriptLines(p){
+  const raw=(p?.spoken_line||p?.script||"").trim();
+  if(!raw)return[];
+  let lines=raw.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+  if(lines.length<2)lines=raw.split(/(?<=[.!?])\s+/).map(x=>x.trim()).filter(Boolean);
+  return lines;
+}
+function shootSheet(d,p,pr){
+  const ig=feedPlan(d)||{}, captured=pr.captured||[], shots=Array.isArray(ig.shots)?ig.shots:[];
+  const lines=scriptLines(ig);
+  return`<section class=shootsheet>
+    <div class=sheethero><div><span class=eyebrow>TODAY'S PRODUCTION</span><h3>${E(ig.fmt||"STORIES / CAPTURE")}</h3><p>${E(ig.concept||d.tag||d.title)}</p></div><div class="state ${E(pr.status)}">${E(pr.status)}</div></div>
+    <section class="sheetsection shotsheet"><div class=sheettitle><span>01</span><div><b>SHOT LIST</b><small>WHAT YOU NEED TO GET</small></div><strong>${captured.length}/${Math.max(shots.length,(d.film||[]).length)} DONE</strong></div>
+      <div class=shotgrid>${(shots.length?shots:(d.film||[]).map(x=>x.line)).map((x,i)=>`<label class="shotitem ${captured.includes(i)?"done":""}"><button data-cap=${i}>${captured.includes(i)?"✓":"○"}</button><span>${E(x)}</span></label>`).join("")||'<p class=dim>No shots required.</p>'}</div>
+    </section>
+    <section class="sheetsection scriptsheet"><div class=sheettitle><span>02</span><div><b>SCRIPT + VISUALS</b><small>WHAT TO SAY · WHAT TO SHOW</small></div></div>
+      ${lines.length?`<div class=scriptvisuals>${lines.map((line,i)=>`<div class=scriptrow><div class=scriptline><small>LINE ${String(i+1).padStart(2,"0")}</small><p>“${E(line)}”</p></div><div class=visualrec><small>VISUAL</small><p>${E(visualForLine(line,i,ig))}</p></div></div>`).join("")}</div>`:`<div class=noscript><p>No fixed script. Capture the story naturally.</p></div>`}
+    </section>
+    <section class="sheetsection copysheet"><div class=sheettitle><span>03</span><div><b>POST COPY</b><small>READY TO COPY</small></div></div>
+      <div class=copybox>${ig.cap?`<p>${NL(ig.cap)}</p><button class=copybtn data-copy="caption">COPY CAPTION</button>`:'<p class=dim>Write after capture — no final caption yet.</p>'}</div>
+      <div class=publishmeta>${ig.cover_text?`<div><small>COVER</small><strong>${E(ig.cover_text)}</strong></div>`:""}${ig.onscreen?`<div><small>ON SCREEN</small><strong>${E(ig.onscreen)}</strong></div>`:""}</div>
+    </section>
+    ${Array.isArray(ig.stories)&&ig.stories.length?`<details class=storydetails><summary>STORIES <span>${ig.stories.length} asks</span></summary><ul>${ig.stories.map(x=>`<li>${E(x)}</li>`).join("")}</ul></details>`:""}
+  </section>`
+}
 function day(w){
- let d=w.days[S.di],p=S.ch==="youtube"?d.youtube:d.post?.[S.ch],ig=feedPlan(d),pr=prod(d),captured=pr.captured||[],film=productionPlan(d,captured);
+ let d=w.days[S.di],p=S.ch==="youtube"?d.youtube:d.post?.[S.ch],ig=feedPlan(d),pr=prod(d);
  let editor="";if(S.editing&&p){let base=S.ch==="youtube"?"youtube":`post.${S.ch}`;editor=`<div class=editor><h3>EDIT CONTENT</h3>${editField("FORMAT",base+".fmt",p.fmt,false)}${editField("CONCEPT",base+".concept",p.concept,false)}${editField("VIEWER VALUE",base+".viewer_value",p.viewer_value)}${editField("IDEA / PLAN",base+".plan",p.plan)}${editField("TO CAMERA / VOICEOVER",base+".spoken_line",p.spoken_line||p.script)}${editField("COVER TEXT",base+".cover_text",p.cover_text)}${editField("ON-SCREEN TEXT",base+".onscreen",p.onscreen)}${editField("POST COPY",base+".cap",p.cap)}<div class=editactions><button id=saveedit>SAVE CHANGES</button><button id=canceledit>CANCEL</button></div></div>`}
- return`<section class=daytitle><span class=eyebrow>W${String(S.wi+1).padStart(2,"0")} / ${E(w.theme)}</span><h2>${E(d.title)}</h2><em>${E(d.tag||"")}</em><div class=statusbar><span>CONTENT STATUS</span>${["planned","captured","edited","published"].map(x=>`<button data-status=${x} class=${pr.status===x?"active":""}>${x}</button>`).join("")}</div></section>
+ return`<section class=daytitle><span class=eyebrow>W${String(S.wi+1).padStart(2,"0")} / ${E(w.theme)}</span><h2>${E(d.title)}</h2><em>${E(d.tag||"")}</em><div class=statusbar><span>STATUS</span>${["planned","captured","edited","published"].map(x=>`<button data-status=${x} class=${pr.status===x?"active":""}>${x}</button>`).join("")}</div></section>
  ${checkinBox(w,d)}
  <div class="pills days">${DN.map((x,i)=>`<button data-d=${i} class=${i===S.di?"active":""}>${x}</button>`).join("")}</div>
- <section class=todaygrid>
-   <div class=todaymain>
-     ${postingSummary(ig)}
-     <section class=worksection><div class=sectionhead><span>01</span><div><b>PRODUCTION PLAN</b><small>${captured.length}/${d.film?.length||0} CAPTURED</small></div></div>${film||'<p class=dim>No production beats planned.</p>'}</section>
-     <section class=worksection><div class=sectionhead><span>02</span><div><b>POSTING PLAN</b><small>SCRIPT · VISUALS · COPY</small></div></div><div class=socialtop><div class="pills channels">${CH.filter(x=>x!=="youtube"||S.di===6).map(x=>`<button data-c=${x} class=${x===S.ch?"active":""}>${x}</button>`).join("")}</div><button id=editcontent>${S.editing?"EDITING":"EDIT CONTENT"}</button></div>${S.editing?editor:post(p,S.ch)}</section>
-   </div>
-   <aside class=todayside>
-     <div class=sidecard><span>CAPTURE ASK</span><strong>${E(ig?.shots?.[0]||(d.film||[])[0]?.line||"Capture what actually happens.")}</strong>${Array.isArray(ig?.shots)?`<ul>${ig.shots.slice(1,5).map(x=>`<li>${E(x)}</li>`).join("")}</ul>`:""}</div>
-     ${ig?.spoken_line||ig?.script?`<div class="sidecard scriptpeek"><span>SCRIPT</span><p>${NL(ig.spoken_line||ig.script)}</p></div>`:""}
-     ${ig?.cap?`<div class=sidecard><span>POST COPY</span><p>${NL(ig.cap)}</p></div>`:""}
-     ${Array.isArray(ig?.stories)?`<div class=sidecard><span>STORIES</span><ul>${ig.stories.map(x=>`<li>${E(x)}</li>`).join("")}</ul></div>`:""}
-   </aside>
- </section>`
+ <div class=productiontoolbar><div class="pills channels">${CH.filter(x=>x!=="youtube"||S.di===6).map(x=>`<button data-c=${x} class=${x===S.ch?"active":""}>${x}</button>`).join("")}</div><button id=editcontent>${S.editing?"EDITING":"EDIT PLAN"}</button></div>
+ ${S.editing?editor:(S.ch==="instagram"?shootSheet(d,p,pr):`<section class=worksection>${post(p,S.ch)}</section>`)}`
 }
 function posted(w){
  let rows=w.days.map((d,i)=>({d,i,p:feedPlan(d),pr:prod(d)})).filter(x=>S.postedFilter==="all"||x.pr.status===S.postedFilter);
@@ -104,6 +127,7 @@ function weeks(){
     if($("canceledit"))$("canceledit").onclick=()=>{S.editing=false;weeks()};
     if($("togglecheck"))$("togglecheck").onclick=()=>{S.checkin=!S.checkin;weeks()};
     if($("applycheck"))$("applycheck").onclick=()=>saveCheckin(w,w.days[S.di]);
+    document.querySelectorAll("[data-copy]").forEach(b=>b.onclick=async()=>{let d=w.days[S.di],txt=d.post?.instagram?.cap||"";if(txt){try{await navigator.clipboard.writeText(txt);b.textContent="COPIED ✓";setTimeout(()=>b.textContent="COPY CAPTION",1200)}catch(e){console.error(e)}}});
     if($("new"))$("new").onclick=()=>alert("AI week generation is the next beta build.");
   }catch(err){
     console.error("WEEKS RENDER ERROR",err);
