@@ -2,17 +2,15 @@ import{createClient}from"@supabase/supabase-js";
 import"./style.css";
 import"./intelligence.css";
 import{renderIntelligence}from"./intelligence-dashboard.js";
-import{renderSocialStats}from"./stats-dashboard.js";
-import"./stats-dashboard.css";
 
 const sb=createClient(import.meta.env.VITE_SUPABASE_URL,import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
 const S={tab:"weeks",view:innerWidth>=900?"board":"day",wi:0,di:0,ch:"instagram",weeks:[],events:[],moments:[],session:null,editing:false,checkin:false,postedFilter:"all"};
-const $=x=>document.getElementById(x),V=()=>document.getElementById("view"),E=(x="")=>String(x).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])),NL=x=>E(x||"").replaceAll("\n","<br>");
+const $=x=>document.getElementById(x),A=()=>document.getElementById("app"),V=()=>document.getElementById("view"),E=(x="")=>String(x).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])),NL=x=>E(x||"").replaceAll("\n","<br>");
 const DN=["MON","TUE","WED","THU","FRI","SAT","SUN"],CH=["instagram","threads","linkedin","substack","youtube"];
 function date(start,i=0){let d=new Date(start+"T12:00:00");d.setDate(d.getDate()+i);return d}
 function ds(start,i=0){return date(start,i).toLocaleDateString("en-ZA",{day:"2-digit",month:"short"}).toUpperCase()}
 function iso(start,i){return date(start,i).toISOString().slice(0,10)}
-function shell(){app.innerHTML=`<header><div><span class=kicker>HYPRFY / LIFE OS</span><h1>ON A MISSION</h1><em>More life. Less excuses.</em></div><span id=status>SYNCED</span><nav>${["weeks","intelligence","calendar","moments"].map(x=>`<button data-tab=${x} class=${S.tab===x?"active":""}>${x}</button>`).join("")}</nav></header><main id=view></main>`;document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;shell();render()})}
+function shell(){A().innerHTML=`<header><div><span class=kicker>HYPRFY / LIFE OS</span><h1>ON A MISSION</h1><em>More life. Less excuses.</em></div><span id=status>SYNCED</span><nav>${["weeks","intelligence","calendar","moments"].map(x=>`<button data-tab=${x} class=${S.tab===x?"active":""}>${x}</button>`).join("")}</nav></header><main id=view></main>`;document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;shell();render()})}
 function adapt(d){return d.adaptive||{actual:[]}}
 function prod(d){return d.production||{status:"planned",captured:[]}}
 async function saveDays(w){let{error}=await sb.from("weeks").update({days:w.days}).eq("start_date",w.start_date);if(error){alert(error.message);return false}return true}
@@ -84,7 +82,34 @@ function posted(w){
 }
 function episode(w){let C=[["COLD OPEN","Strongest moments from the finished week",6],["01 — BACK IN MOTION","10km confidence + Monday world",0],["02 — THE PLAN CHANGES","Reality interrupts the plan",1],["03 — THE WORK","Office + Rexona + R&D workshop",3],["04 — PEOPLE BUILDING THINGS","Coastal Coffee / Craig",4],["05 — MORE LIFE","Family / ordinary Saturday",5],["REFLECTION + OUTRO","What the week actually showed you",6]];return`${ephead(w)}${storyState(w)}<section class=timeline>${C.map(([a,b,i],n)=>`<button data-open=${i}><span>${String(n+1).padStart(2,"0")}</span><div><b>${a}</b><p>${b}</p></div></button>`).join("")}</section>`}
 function monthly(w){return`<section class=ephead><div><span class=eyebrow>MONTHLY WRAP / JULY 2026</span><h2>POSTCARDS FROM JULY</h2><em>A visual journal of the moments that made the month.</em></div></section><section class=monthly><div class=monthlyhero><span>MONTHLY PROPERTY</span><h3>POSTCARDS FROM JULY</h3><p>Not a list of achievements. A collection of moments that made July feel like July.</p></div><div class=monthlygrid>${[["DRAKENSBERG","Adventure / family / getting outside"],["COFFEE DATES","Relationships / slowing down / connection"],["SA RUGBY CAPTAIN’S RUN","Career / access / behind the work"],["SOCIAL RUNNERS 10KM","Getting back in motion"]].map((x,i)=>`<article><span>0${i+1}</span><h4>${x[0]}</h4><p>${x[1]}</p></article>`).join("")}</div><div class="brief monthlybrief"><span>CAROUSEL SEQUENCE</span><ol><li>Cover — POSTCARDS FROM JULY</li><li>Big Drakensberg landscape</li><li>Candid Drakensberg / family moment</li><li>Coffee date</li><li>SA Rugby captain’s run</li><li>Behind-the-scenes rugby detail</li><li>Ordinary July moment</li><li>Social Runners 10km</li><li>Finish / post-run moment</li><li>Quiet closing image</li></ol></div><div class="brief cover"><span>COVER TEXT</span><h4>POSTCARDS FROM JULY</h4></div><div class=brief><span>POST COPY</span><p class=copy>Postcards from July.<br><br>Mountains. Coffee dates. A little behind-the-scenes rugby. And my first 10km in a long time.<br><br>Nothing particularly connected about any of it.<br><br>Except maybe that’s the point.<br><br>More time doing things. More time with good people. More reasons to get outside. And slowly finding my way back into training again.<br><br>A pretty good July.<br><br>More life. Less excuses.</p></div></section>`}
-function weeks(){let w=S.weeks[S.wi];if(!w)return V().innerHTML="<p>No week found.</p>";V().innerHTML=top(w)+(S.view==="board"?board(w):S.view==="posted"?posted(w):S.view==="episode"?episode(w):S.view==="monthly"?monthly(w):day(w));document.querySelectorAll("[data-w]").forEach(b=>b.onclick=()=>{S.wi=+b.dataset.w;weeks()});document.querySelectorAll("[data-v]").forEach(b=>b.onclick=()=>{S.view=b.dataset.v;weeks()});document.querySelectorAll("[data-pf]").forEach(b=>b.onclick=()=>{S.postedFilter=b.dataset.pf;weeks()});document.querySelectorAll("[data-open]").forEach(b=>b.onclick=e=>{e.stopPropagation();S.di=+b.dataset.open;S.view="day";weeks()});document.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>{S.di=+b.dataset.d;S.ch="instagram";S.checkin=false;weeks()});document.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>{S.ch=b.dataset.c;S.editing=false;weeks()});document.querySelectorAll("[data-status]").forEach(b=>b.onclick=()=>setStatus(w,w.days[S.di],b.dataset.status));document.querySelectorAll("[data-cap]").forEach(b=>b.onclick=()=>toggleCapture(w,w.days[S.di],+b.dataset.cap));if($("editcontent"))$("editcontent").onclick=()=>{S.editing=!S.editing;weeks()};if($("saveedit"))$("saveedit").onclick=()=>saveEdits(w,w.days[S.di]);if($("canceledit"))$("canceledit").onclick=()=>{S.editing=false;weeks()};if($("togglecheck"))$("togglecheck").onclick=()=>{S.checkin=!S.checkin;weeks()};if($("applycheck"))$("applycheck").onclick=()=>saveCheckin(w,w.days[S.di]);if($("new"))$("new").onclick=()=>alert("AI week generation is the next beta build.")}
+function weeks(){
+  try{
+    if(!Array.isArray(S.weeks)||!S.weeks.length){V().innerHTML="<section class=page><h2>NO WEEKS FOUND</h2><p class=dim>The database returned no week plans.</p></section>";return}
+    if(S.wi<0||S.wi>=S.weeks.length)S.wi=S.weeks.length-1;
+    let w=S.weeks[S.wi];
+    if(!Array.isArray(w.days)){console.error("Invalid week days",w);V().innerHTML="<section class=page><h2>WEEK DATA ERROR</h2><p class=dim>This week does not contain a valid seven-day plan.</p></section>";return}
+    if(S.di<0||S.di>=w.days.length)S.di=0;
+    V().innerHTML=top(w)+(S.view==="board"?board(w):S.view==="posted"?posted(w):S.view==="episode"?episode(w):S.view==="monthly"?monthly(w):day(w));
+    document.querySelectorAll("[data-w]").forEach(b=>b.onclick=()=>{S.wi=+b.dataset.w;S.di=0;weeks()});
+    document.querySelectorAll("[data-v]").forEach(b=>b.onclick=()=>{S.view=b.dataset.v;weeks()});
+    document.querySelectorAll("[data-pf]").forEach(b=>b.onclick=()=>{S.postedFilter=b.dataset.pf;weeks()});
+    document.querySelectorAll("[data-open]").forEach(b=>b.onclick=e=>{e.stopPropagation();S.di=+b.dataset.open;S.view="day";weeks()});
+    document.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>{S.di=+b.dataset.d;S.ch="instagram";S.checkin=false;weeks()});
+    document.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>{S.ch=b.dataset.c;S.editing=false;weeks()});
+    document.querySelectorAll("[data-status]").forEach(b=>b.onclick=()=>setStatus(w,w.days[S.di],b.dataset.status));
+    document.querySelectorAll("[data-cap]").forEach(b=>b.onclick=()=>toggleCapture(w,w.days[S.di],+b.dataset.cap));
+    if($("editcontent"))$("editcontent").onclick=()=>{S.editing=!S.editing;weeks()};
+    if($("saveedit"))$("saveedit").onclick=()=>saveEdits(w,w.days[S.di]);
+    if($("canceledit"))$("canceledit").onclick=()=>{S.editing=false;weeks()};
+    if($("togglecheck"))$("togglecheck").onclick=()=>{S.checkin=!S.checkin;weeks()};
+    if($("applycheck"))$("applycheck").onclick=()=>saveCheckin(w,w.days[S.di]);
+    if($("new"))$("new").onclick=()=>alert("AI week generation is the next beta build.");
+  }catch(err){
+    console.error("WEEKS RENDER ERROR",err);
+    V().innerHTML=`<section class=page><span class=eyebrow>PRODUCTION UI</span><h2>WEEKS COULD NOT RENDER</h2><p class=dim>${E(err?.message||String(err))}</p><button id=retryweeks>RETRY</button></section>`;
+    if($("retryweeks"))$("retryweeks").onclick=()=>weeks();
+  }
+}
 
 /* V2 Intelligence */
 async function intelligence(){
@@ -98,7 +123,7 @@ function dels(){document.querySelectorAll("[data-del]").forEach(b=>b.onclick=asy
 function render(){
   if(!S.session){
     V().innerHTML=`<section class=page><h2>SIGN IN</h2><form id=login><input id=email type=email placeholder=Email required><input id=pw type=password placeholder=Password required><button>Sign in</button></form></section>`;
-    login.onsubmit=async e=>{e.preventDefault();let{error}=await sb.auth.signInWithPassword({email:email.value,password:pw.value});if(error)alert(error.message)};
+    $("login").onsubmit=async e=>{e.preventDefault();let{error}=await sb.auth.signInWithPassword({email:email.value,password:pw.value});if(error)alert(error.message)};
     return;
   }
   if(S.tab==="intelligence")return intelligence();
