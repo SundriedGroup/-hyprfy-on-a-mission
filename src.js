@@ -1,4 +1,8 @@
-import{createClient}from"@supabase/supabase-js";import"./style.css";import{renderSocialStats}from"./stats-dashboard.js";import"./stats-dashboard.css";
+import{createClient}from"@supabase/supabase-js";
+import"./style.css";
+import"./intelligence.css";
+import{renderIntelligence}from"./intelligence-dashboard.js";
+import{renderSocialStats}from"./stats-dashboard.js";import"./stats-dashboard.css";
 const sb=createClient(import.meta.env.VITE_SUPABASE_URL,import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
 const S={tab:"weeks",view:innerWidth>=900?"board":"day",wi:0,di:0,ch:"instagram",weeks:[],events:[],moments:[],session:null,editing:false,checkin:false};
 const $=x=>document.getElementById(x),E=(x="")=>String(x).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])),NL=x=>E(x||"").replaceAll("\n","<br>");
